@@ -8,6 +8,7 @@
             <el-row>
               <el-button type="info" plain>购买</el-button>
               <el-button type="warning" plain>出售</el-button>
+              <el-button type="success" plain @click="jumpToAcution">竞拍</el-button>
             </el-row>
           </el-col>
           <el-col :span="6">
@@ -41,17 +42,17 @@
       </el-header>
       <el-main>
         <el-table :data="tableData" style="width: 100%" :row-class-name="tableRowClassName">
-          <el-table-column prop="maker" label="商家" width="300">
+          <el-table-column prop="maker" label="商家" width="150">
           </el-table-column>
           <el-table-column prop="order" label="订单号" width="200">
           </el-table-column>
           <el-table-column prop="quantity" label="数量" width="200">
           </el-table-column>
-          <el-table-column prop="limit" label="限额" width="300">
+          <el-table-column prop="limit" label="限额" width="250">
           </el-table-column>
-          <el-table-column prop="unit" label="单价" width="200">
+          <el-table-column prop="unit" label="单价" width="150">
           </el-table-column>
-          <el-table-column prop="bond" label="保证金要求" width="200">
+          <el-table-column prop="bond" label="保证金要求" width="150">
           </el-table-column>
           <el-table-column prop="contact" label="联系方式" width="200">
           </el-table-column>
@@ -77,6 +78,9 @@
           return 'success-row';
         }
         return '';
+      },
+      jumpToAcution() {
+        this.$router.push('/auction')
       }
     },
     data() {
