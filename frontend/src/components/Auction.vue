@@ -21,7 +21,7 @@
             <el-col :span="8">数量</el-col>
             <el-col :span="16"><el-input v-model="form.gross" placeholder="请输入内容"></el-input></el-col>
           </el-row>
-          <el-button type="primary" @click="purchase" :disabled="this.jugle.low == null" plain>购买</el-button>
+          <el-button type="primary" @click="purchase" :disabled="auction_enabled == false" plain>购买</el-button>
           <div>剩余时间：{{ remain_time }}</div>
         </el-aside>
       </el-container>
@@ -34,6 +34,7 @@
 <script>
   import Web3 from "web3"
   import AuctionAbi from "../dotc/auction"
+  import USDTAbi from "../dotc/usdt"
   import Dayjs from "dayjs"
 
   if (typeof ethereum === 'undefined') {
@@ -41,19 +42,20 @@
   }
 
   let web3 = new Web3(ethereum)
-  let auction = new web3.eth.Contract(AuctionAbi, "0xAe8501ff3F4d22E08B3D6d11575D0f54Cf35EbaC")
+  let account_address = ""
+  let auction_address = "0xcD9cB9909Ef0223a20ED3ca0ad4c5cB4DBafC7D4"
+  let auction = new web3.eth.Contract(AuctionAbi, auction_address)
+  let usdt = new web3.eth.Contract(USDTAbi, "0x055ca37302a360cba1774f1b286d163ea6480a87")
+
+  let depi, Tem, timb, low, sp, total, balanc, step, Tima, gross
 
   export default {
     created() {
       eventBus.$on("auction_info", (i, key, value) => {
         this.auction_info[i][key] = value
       })
-      eventBus.$on("remain_time", (value) => {
-        this.remain_time = value
-      })
-      eventBus.$on("jugle", (key, value) => {
-        this.jugle[key] = value
-        this.form[key] = value
+      eventBus.$on("key", (key, value) => {
+        this[key] = value
       })
 
       function make_callback(name) {
@@ -66,7 +68,6 @@
         }
       }
 
-      let depi, Tem, timb, low, sp, total, balanc, step, Tima, gross
       function handle_callback(name, value) {
         switch (name) {
           case "depi": {
@@ -91,44 +92,47 @@
           break
           case "timb": {
             timb = value
-            eventBus.$emit("remain_time", Dayjs.unix(Tem - (Date.now() / 1000 - timb)).format("hh:mm:ss"))
+            eventBus.$emit("key", "remain_time", Dayjs.unix(Tem - (Date.now() / 1000 - timb)).format("hh:mm:ss"))
           }
           break
           case "low": {
-            low = value
-            eventBus.$emit("jugle", "low", (low / Math.pow(10, 18)).toFixed(2))
+            low = value / Math.pow(10, 18)
             eventBus.$emit("auction_info", 2, "right_value", `${(low / Math.pow(10, 18)).toFixed(2)} USDT`)
+            web3.eth.getAccounts().then(accounts => {
+              console.log(accounts)
+              account_address = accounts[0]
+              eventBus.$emit("key", "auction_enabled", true)
+            })
             // 最低价持有量
-            auction.methods.gross(depi, low).call(null, make_callback("gross"))
+            auction.methods.gross(depi, value).call(null, make_callback("gross"))
           }
           break
           case "gross": {
-            gross = value
-            eventBus.$emit("jugle", "gross", (gross / Math.pow(10, 18)).toFixed(2))
-            eventBus.$emit("auction_info", 3, "right_value", `${(gross / Math.pow(10, 18)).toFixed(2)} GAZ`)
+            gross = value / Math.pow(10, 18)
+            eventBus.$emit("auction_info", 3, "right_value", `${gross.toFixed(2)} GAZ`)
           }
           break
           case "sp": {
-            sp = value
-            eventBus.$emit("auction_info", 0, "right_value", `${(sp / Math.pow(10, 18)).toFixed(2)} USDT`)
+            sp = value / Math.pow(10, 18)
+            eventBus.$emit("auction_info", 0, "right_value", `${sp.toFixed(2)} USDT`)
           }
           break
           case "total": {
-            total = value
-            eventBus.$emit("auction_info", 1, "left_value", `${(total / Math.pow(10, 18)).toFixed(2)} GAZ`)
+            total = value / Math.pow(10, 18)
+            eventBus.$emit("auction_info", 1, "left_value", `${total.toFixed(2)} GAZ`)
             // 剩余量
             auction.methods.balanc().call(null, make_callback("balanc"))
           }
           break
           case "balanc": {
-            balanc = value
-            eventBus.$emit("auction_info", 3, "left_value", `${(balanc / Math.pow(10, 18)).toFixed(2)} GAZ`)
+            balanc = value / Math.pow(10, 18)
+            eventBus.$emit("auction_info", 3, "left_value", `${balanc.toFixed(2)} GAZ`)
             eventBus.$emit("auction_info", 2, "left_value", `${(balanc / total * 100).toFixed(2)}%`)
           }
           break
           case "step": {
-            step = value
-            eventBus.$emit("auction_info", 1, "right_value", `${(step / Math.pow(10, 18)).toFixed(2)} USDT`)
+            step = value / Math.pow(10, 18)
+            eventBus.$emit("auction_info", 1, "right_value", `${step.toFixed(2)} USDT`)
           }
           break
           case "Tima": {
@@ -145,19 +149,93 @@
       auction.methods.Tima().call(null, make_callback("Tima"))
     },
     methods: {
-      purchase() {
-        if (this.form.offer < this.jugle.low) {
-          alert("出价不能低于当前最低出价值: " + this.jugle.low + " USDT")
+      async purchase() {
+        this.auction_enabled = false
+        function checkUSDTAuth() {
+          return new Promise((resolve, reject) => {
+            usdt.methods.allowance(account_address, auction_address).call((error, value) => {
+              if (error) {
+                reject(error)
+              } else {
+                console.log("allowance", value)
+                resolve(value / Math.pow(10, 18))
+              }
+            })
+          })
         }
-
-      }
-    },
-    watch: {
-      "form.offer": {
-        handler(new_value, old_value) {
-          console.log('change')
-        },
-        deep: true
+        function auth(low) {
+          return new Promise((resolve, reject) => {
+            usdt.methods.approve(auction_address, web3.utils.toBN(low)).send({from: account_address}, (error, value) => {
+              if (error) {
+                reject(error)
+              } else {
+                console.log("auth result", value)
+                resolve(value)
+              }
+            })
+          })
+        }
+        function auctionGaz(offer, num) {
+          console.log(offer, num)
+          return new Promise((resolve, reject) => {
+            auction.methods.auction(web3.utils.toBN(offer), web3.utils.toBN(num)).send({from: account_address}, (error, value) => {
+              if (error) {
+                reject(error)
+              } else {
+                console.log("auctionGaz result", value)
+                resolve(value)
+              }
+            })
+          })
+        }
+        function checkUserGross(num) {
+          return new Promise((resolve, reject) => {
+            auction.methods.check(depi, num).call((error, value) => {
+              if (error) {
+                reject(error)
+              } else {
+                resolve(value / Math.pow(10, 18))
+              }
+            })
+          })
+        }
+        if (this.form.low == 0 || this.form.gross == 0) {
+          alert("出价和数量都不能为0")
+        } else if (balanc > 0) {
+          if (this.form.low < sp) {
+            alert("出价不能低于当前最低出价值: " + sp.toFixed(2) + " USDT")
+          } else if (this.form.gross > gross) {
+            alert("数量不能高于当前最低持有量: " + gross.toFixed(2) + " GAZ")
+          } else {
+            let min_num = await checkUSDTAuth()
+            let user_num =  this.form.low * this.form.gross
+            if (min_num < user_num) {
+              alert("USDT合约还未进行授权或授权数额不够，要先授权才能进行转账操作")
+              await auth(user_num * Math.pow(10, 18))
+            }
+            let hash = await auctionGaz(this.form.low * Math.pow(10, 18), this.form.gross * Math.pow(10, 18))
+            alert("竞拍成功，交易id为" + hash)
+          }
+        } else {
+          if (this.form.low < low) {
+            alert("出价不能低于当前最低出价值: " + low.toFixed(2) + " USDT")
+          } else {
+            let user_gross = await checkUserGross(this.form.gross * Math.pow(10, 18))
+            if (this.form.gross > user_gross) {
+              alert("数量不能高于当前最低持有量: " + user_gross.toFixed(2) + " GAZ")
+            } else {
+              let min_num = await checkUSDTAuth()
+              let user_num =  this.form.low * this.form.gross
+              if (min_num < user_num) {
+                alert("USDT合约还未进行授权或授权数额不够，要先授权才能进行转账操作")
+                await auth(user_num * Math.pow(10, 18))
+              }
+              let hash = await auctionGaz(this.form.low * Math.pow(10, 18), this.form.gross * Math.pow(10, 18))
+              alert("竞拍成功，交易id为" + hash)
+            }
+          }
+        }
+        this.auction_enabled = true
       }
     },
     data() {
@@ -198,10 +276,7 @@
           low: 0,
           gross: 0
         },
-        jugle: {
-          low: null,
-          gross: null
-        },
+        auction_enabled: false,
         // 剩余时间
         remain_time: "..."
       }
