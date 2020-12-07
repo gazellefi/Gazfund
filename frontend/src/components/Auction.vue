@@ -88,14 +88,12 @@
           case "Tem": {
             Tem = Math.floor(value)
             eventBus.$emit("auction_info", 4, "right_value", (Tem / 3600 / 24).toFixed(1) + "天")
-            // 用于计算剩余时间
-            auction.methods.timb().call(null, make_callback("timb"))
           }
           break
           case "timb": {
             timb = Math.floor(value)
             setInterval(() => {
-              eventBus.$emit("key", "remain_time", TimeFormater.countdown(Tem - (Date.now() / 1000 - timb)).format("d天H时m分s秒"))
+              eventBus.$emit("key", "remain_time", TimeFormater.countdown(Tima - (Date.now() / 1000 - timb)).format("d天H时m分s秒"))
             }, 1000)
           }
           break
@@ -142,6 +140,8 @@
           case "Tima": {
             Tima = Math.floor(value)
             eventBus.$emit("auction_info", 4, "left_value", (Tima / 3600 / 24).toFixed(1) + "天")
+            // 用于计算剩余时间
+            auction.methods.timb().call(null, make_callback("timb"))
           }
         }
       }
@@ -155,6 +155,7 @@
       auction.methods.balanc().call(null, make_callback("balanc"))
       // 监听拍卖事件
       auction.events.Auction({ fromBlock: "latest" }, (error, event) => {
+        console.log("收到时间回调", event)
         alert(`用户${event.returnValues.ust}竞拍成功，将刷新界面`)
         location.reload()
       })
@@ -199,10 +200,11 @@
         }
         function checkUserGross(num) {
           return new Promise((resolve, reject) => {
-            auction.methods.check(depi, num).call((error, value) => {
+            auction.methods.check(depi, web3.utils.toBN(num)).call((error, value) => {
               if (error) {
                 reject(error)
               } else {
+                console.log(`checkUserGross(${num}) = ${value}`)
                 resolve(value / Math.pow(10, 18))
               }
             })
@@ -210,40 +212,29 @@
         }
         let enabled = true
         if (this.form.low == 0 || this.form.gross == 0) {
-          alert("出价和数量都不能为0")
-        } else if (balanc > 0) {
-          if (this.form.low < sp) {
-            alert("出价不能低于当前最低出价值: " + sp.toFixed(2) + " USDT")
-          } else if (this.form.gross > balanc) {
-            alert("数量不能高于当前最低持有量: " + balanc.toFixed(2) + " GAZ")
-          } else {
-            let min_num = await checkUSDTAuth()
-            let user_num =  this.form.low * this.form.gross
-            if (min_num < user_num) {
-              alert("USDT合约还未进行授权或授权数额不够，要先授权才能进行转账操作")
-              await auth(user_num * Math.pow(10, 18))
-            }
-            let hash = await auctionGaz(this.form.low * Math.pow(10, 18), this.form.gross * Math.pow(10, 18))
-            alert("竞拍成功，ID为" + hash + "，等待确认后将自动刷新界面")
-            enabled = false
-          }
+          alert("出价和数量都需要大于0")
         } else {
-          if (this.form.low < low) {
-            alert("出价不能低于当前最低出价值: " + low.toFixed(2) + " USDT")
+          let max_gross = balanc
+          if (this.form.low > low) {
+            max_gross += await checkUserGross(this.form.low * Math.pow(10, 18))
+          }
+          if (this.form.gross > max_gross) {
+            alert("数量不能多于: " + max_gross.toFixed(2) + " GAZ")
           } else {
-            let user_gross = await checkUserGross(this.form.gross * Math.pow(10, 18))
-            if (this.form.gross > user_gross) {
-              alert("数量不能高于当前最低持有量: " + user_gross.toFixed(2) + " GAZ")
-            } else {
-              let min_num = await checkUSDTAuth()
-              let user_num =  this.form.low * this.form.gross
-              if (min_num < user_num) {
-                alert("USDT合约还未进行授权或授权数额不够，要先授权才能进行转账操作")
-                await auth(user_num * Math.pow(10, 18))
-              }
-              let hash = await auctionGaz(this.form.low * Math.pow(10, 18), this.form.gross * Math.pow(10, 18))
+            let auth_num = await checkUSDTAuth()
+            let require_num = this.form.low * this.form.gross
+            if (auth_num < require_num) {
+              alert("USDT合约还未进行授权或授权数额不够，要先授权才能进行转账操作")
+              await auth(require_num * Math.pow(10, 18))
+            }
+            let hash = await auctionGaz(this.form.low * Math.pow(10, 18), this.form.gross * Math.pow(10, 18)).catch(error => {
+              console.log(error)
+            })
+            if (hash) {
               alert("竞拍成功，ID为" + hash + "，等待确认后将自动刷新界面")
               enabled = false
+            } else {
+              alert("竞拍失败")
             }
           }
         }
