@@ -39,11 +39,15 @@
   import USDTAbi from "../dotc/usdt"
   import TimeFormater from "time-formater"
 
-  if (typeof ethereum === 'undefined') {
+  let web3 = web3
+  if (typeof ethereum !== 'undefined') {
+    web3 = new Web3(ethereum)
+  } else if (typeof web3 !== 'undefined') {
+    web3 = new Web3(web3.currentProvider)
+  } else {
     alert("please install metamask first")
   }
 
-  let web3 = new Web3(ethereum)
   let account_address = ""
   let auction_address = "0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
   let auction = new web3.eth.Contract(AuctionAbi, auction_address)
