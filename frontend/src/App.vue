@@ -8,7 +8,7 @@
 <script>
   export default {
     created() {
-      this.$router.push('/entry')
+      this.$router.push('/auction')
     }
   }
 </script>

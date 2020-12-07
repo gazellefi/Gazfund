@@ -15,11 +15,13 @@
         <el-aside width="220px">
           <el-row :gutter="0">
             <el-col :span="8">出价</el-col>
-            <el-col :span="16"><el-input v-model="form.low" placeholder="请输入内容"></el-input></el-col>
+            <el-col :span="10"><el-input v-model="form.low" placeholder="请输入内容"></el-input></el-col>
+            <el-col :span="6" style="text-align: left; padding-left: 5px;">USDT</el-col>
           </el-row>
           <el-row :gutter="0">
             <el-col :span="8">数量</el-col>
-            <el-col :span="16"><el-input v-model="form.gross" placeholder="请输入内容"></el-input></el-col>
+            <el-col :span="10"><el-input v-model="form.gross" placeholder="请输入内容"></el-input></el-col>
+            <el-col :span="6" style="text-align: left; padding-left: 5px;">GAZ</el-col>
           </el-row>
           <el-button type="primary" @click="purchase" :disabled="auction_enabled == false" plain>购买</el-button>
           <div>剩余时间：{{ remain_time }}</div>
@@ -35,7 +37,7 @@
   import Web3 from "web3"
   import AuctionAbi from "../dotc/auction"
   import USDTAbi from "../dotc/usdt"
-  import Dayjs from "dayjs"
+  import TimeFormater from "time-formater"
 
   if (typeof ethereum === 'undefined') {
     alert("please install metamask first")
@@ -43,7 +45,7 @@
 
   let web3 = new Web3(ethereum)
   let account_address = ""
-  let auction_address = "0xcD9cB9909Ef0223a20ED3ca0ad4c5cB4DBafC7D4"
+  let auction_address = "0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
   let auction = new web3.eth.Contract(AuctionAbi, auction_address)
   let usdt = new web3.eth.Contract(USDTAbi, "0x055ca37302a360cba1774f1b286d163ea6480a87")
 
@@ -84,24 +86,28 @@
           }
           break
           case "Tem": {
-            Tem = value
-            eventBus.$emit("auction_info", 4, "right_value", (Tem / 3600 / 60).toFixed(1) + '天')
+            Tem = Math.floor(value)
+            eventBus.$emit("auction_info", 4, "right_value", (Tem / 3600 / 24).toFixed(1) + "天")
             // 用于计算剩余时间
             auction.methods.timb().call(null, make_callback("timb"))
           }
           break
           case "timb": {
-            timb = value
-            eventBus.$emit("key", "remain_time", Dayjs.unix(Tem - (Date.now() / 1000 - timb)).format("hh:mm:ss"))
+            timb = Math.floor(value)
+            setInterval(() => {
+              eventBus.$emit("key", "remain_time", TimeFormater.countdown(Tem - (Date.now() / 1000 - timb)).format("d天H时m分s秒"))
+            }, 1000)
           }
           break
           case "low": {
             low = value / Math.pow(10, 18)
-            eventBus.$emit("auction_info", 2, "right_value", `${(low / Math.pow(10, 18)).toFixed(2)} USDT`)
-            web3.eth.getAccounts().then(accounts => {
-              console.log(accounts)
-              account_address = accounts[0]
-              eventBus.$emit("key", "auction_enabled", true)
+            eventBus.$emit("auction_info", 2, "right_value", `${low.toFixed(2)} USDT`)
+            ethereum.enable().then(result => {
+              web3.eth.getAccounts().then(accounts => {
+                console.log(accounts)
+                account_address = accounts[0]
+                eventBus.$emit("key", "auction_enabled", true)
+              })
             })
             // 最低价持有量
             auction.methods.gross(depi, value).call(null, make_callback("gross"))
@@ -120,14 +126,12 @@
           case "total": {
             total = value / Math.pow(10, 18)
             eventBus.$emit("auction_info", 1, "left_value", `${total.toFixed(2)} GAZ`)
-            // 剩余量
-            auction.methods.balanc().call(null, make_callback("balanc"))
+            eventBus.$emit("auction_info", 2, "left_value", `${(total / 66666666 * 100).toFixed(2)}%`)
           }
           break
           case "balanc": {
             balanc = value / Math.pow(10, 18)
             eventBus.$emit("auction_info", 3, "left_value", `${balanc.toFixed(2)} GAZ`)
-            eventBus.$emit("auction_info", 2, "left_value", `${(balanc / total * 100).toFixed(2)}%`)
           }
           break
           case "step": {
@@ -136,8 +140,8 @@
           }
           break
           case "Tima": {
-            Tima = value
-            eventBus.$emit("auction_info", 4, "left_value", (Tima / 3600).toFixed(1) + '小时')
+            Tima = Math.floor(value)
+            eventBus.$emit("auction_info", 4, "left_value", (Tima / 3600 / 24).toFixed(1) + "天")
           }
         }
       }
@@ -147,6 +151,13 @@
       auction.methods.step().call(null, make_callback("step"))
       // 拍卖周期
       auction.methods.Tima().call(null, make_callback("Tima"))
+      // 剩余量
+      auction.methods.balanc().call(null, make_callback("balanc"))
+      // 监听拍卖事件
+      auction.events.Auction({ fromBlock: "latest" }, (error, event) => {
+        alert(`用户${event.returnValues.ust}竞拍成功，将刷新界面`)
+        location.reload()
+      })
     },
     methods: {
       async purchase() {
@@ -157,7 +168,6 @@
               if (error) {
                 reject(error)
               } else {
-                console.log("allowance", value)
                 resolve(value / Math.pow(10, 18))
               }
             })
@@ -176,9 +186,8 @@
           })
         }
         function auctionGaz(offer, num) {
-          console.log(offer, num)
           return new Promise((resolve, reject) => {
-            auction.methods.auction(web3.utils.toBN(offer), web3.utils.toBN(num)).send({from: account_address}, (error, value) => {
+            auction.methods.auction(web3.utils.toBN(num), web3.utils.toBN(offer)).send({from: account_address}, (error, value) => {
               if (error) {
                 reject(error)
               } else {
@@ -199,13 +208,14 @@
             })
           })
         }
+        let enabled = true
         if (this.form.low == 0 || this.form.gross == 0) {
           alert("出价和数量都不能为0")
         } else if (balanc > 0) {
           if (this.form.low < sp) {
             alert("出价不能低于当前最低出价值: " + sp.toFixed(2) + " USDT")
-          } else if (this.form.gross > gross) {
-            alert("数量不能高于当前最低持有量: " + gross.toFixed(2) + " GAZ")
+          } else if (this.form.gross > balanc) {
+            alert("数量不能高于当前最低持有量: " + balanc.toFixed(2) + " GAZ")
           } else {
             let min_num = await checkUSDTAuth()
             let user_num =  this.form.low * this.form.gross
@@ -214,7 +224,8 @@
               await auth(user_num * Math.pow(10, 18))
             }
             let hash = await auctionGaz(this.form.low * Math.pow(10, 18), this.form.gross * Math.pow(10, 18))
-            alert("竞拍成功，交易id为" + hash)
+            alert("竞拍成功，ID为" + hash + "，等待确认后将自动刷新界面")
+            enabled = false
           }
         } else {
           if (this.form.low < low) {
@@ -231,11 +242,12 @@
                 await auth(user_num * Math.pow(10, 18))
               }
               let hash = await auctionGaz(this.form.low * Math.pow(10, 18), this.form.gross * Math.pow(10, 18))
-              alert("竞拍成功，交易id为" + hash)
+              alert("竞拍成功，ID为" + hash + "，等待确认后将自动刷新界面")
+              enabled = false
             }
           }
         }
-        this.auction_enabled = true
+        this.auction_enabled = enabled
       }
     },
     data() {
