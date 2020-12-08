@@ -49,11 +49,27 @@
   }
 
   let account_address = ""
-  let auction_address = "0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
+  let auction_address = "0xBbe0DfB5186aE9106921FDeA9EAf98A20A277b88"//"0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
   let auction = new web3.eth.Contract(AuctionAbi, auction_address)
-  let usdt = new web3.eth.Contract(USDTAbi, "0x055ca37302a360cba1774f1b286d163ea6480a87")
+  let usdt = new web3.eth.Contract(USDTAbi, "0x250efAE8Cee54Cf9768E54cfF4dE5250A7830B2C")
 
-  let depi, Tem, timb, low, sp, total, balanc, step, Tima, gross
+  let depi, Tem, timb, low, sp, total, balanc, step, Tima, gross, intv
+
+  function fromWei(value) {
+    return parseFloat(web3.utils.fromWei(value, 'ether'))
+  }
+
+  function toWei(value) {
+    return web3.utils.toWei(value, 'ether')
+  }
+
+  function toUsdt(value) {
+    return web3.utils.toBN(value * Math.pow(10, 6))
+  }
+
+  function fromUsdt(value) {
+    return value / Math.pow(10, 6)
+  }
 
   export default {
     created() {
@@ -62,6 +78,21 @@
       })
       eventBus.$on("key", (key, value) => {
         this[key] = value
+      })
+      eventBus.$on("refreash", () => {
+        this.auction_info.forEach(v => {
+          v.left_value = '...'
+          v.right_value = '...'
+        })
+        this.remain_time = '...'
+        // 拍卖轮次
+        auction.methods.depi().call(null, make_callback("depi"))
+        // 加价幅度
+        auction.methods.step().call(null, make_callback("step"))
+        // 拍卖周期
+        auction.methods.Tima().call(null, make_callback("Tima"))
+        // 剩余量
+        auction.methods.balanc().call(null, make_callback("balanc"))
       })
 
       function make_callback(name) {
@@ -96,13 +127,14 @@
           break
           case "timb": {
             timb = Math.floor(value)
-            setInterval(() => {
+            clearInterval(intv)
+            intv = setInterval(() => {
               eventBus.$emit("key", "remain_time", TimeFormater.countdown(Tima - (Date.now() / 1000 - timb)).format("d天H时m分s秒"))
             }, 1000)
           }
           break
           case "low": {
-            low = value / Math.pow(10, 18)
+            low = fromUsdt(value)
             eventBus.$emit("auction_info", 2, "right_value", `${low.toFixed(2)} USDT`)
             ethereum.enable().then(result => {
               web3.eth.getAccounts().then(accounts => {
@@ -116,28 +148,28 @@
           }
           break
           case "gross": {
-            gross = value / Math.pow(10, 18)
+            gross = fromWei(value)
             eventBus.$emit("auction_info", 3, "right_value", `${gross.toFixed(2)} GAZ`)
           }
           break
           case "sp": {
-            sp = value / Math.pow(10, 18)
+            sp = fromUsdt(value)
             eventBus.$emit("auction_info", 0, "right_value", `${sp.toFixed(2)} USDT`)
           }
           break
           case "total": {
-            total = value / Math.pow(10, 18)
+            total = fromWei(value)
             eventBus.$emit("auction_info", 1, "left_value", `${total.toFixed(2)} GAZ`)
             eventBus.$emit("auction_info", 2, "left_value", `${(total / 66666666 * 100).toFixed(2)}%`)
           }
           break
           case "balanc": {
-            balanc = value / Math.pow(10, 18)
+            balanc = fromWei(value)
             eventBus.$emit("auction_info", 3, "left_value", `${balanc.toFixed(2)} GAZ`)
           }
           break
           case "step": {
-            step = value / Math.pow(10, 18)
+            step = fromUsdt(value)
             eventBus.$emit("auction_info", 1, "right_value", `${step.toFixed(2)} USDT`)
           }
           break
@@ -149,19 +181,12 @@
           }
         }
       }
-      // 拍卖轮次
-      auction.methods.depi().call(null, make_callback("depi"))
-      // 加价幅度
-      auction.methods.step().call(null, make_callback("step"))
-      // 拍卖周期
-      auction.methods.Tima().call(null, make_callback("Tima"))
-      // 剩余量
-      auction.methods.balanc().call(null, make_callback("balanc"))
+      eventBus.$emit("refreash")
       // 监听拍卖事件
       auction.events.Auction({ fromBlock: "latest" }, (error, event) => {
-        console.log("收到时间回调", event)
-        alert(`用户${event.returnValues.ust}竞拍成功，将刷新界面`)
-        location.reload()
+        console.log("收到Auction事件回调", event)
+        // alert(`用户${event.returnValues.ust}竞拍成功，将刷新界面`)
+        eventBus.$emit("refreash")
       })
     },
     methods: {
@@ -173,54 +198,63 @@
               if (error) {
                 reject(error)
               } else {
-                resolve(value / Math.pow(10, 18))
+                console.log("checkUSDTAuth() =", fromUsdt(value))
+                resolve(fromUsdt(value))
               }
             })
           })
         }
         function auth(low) {
           return new Promise((resolve, reject) => {
-            usdt.methods.approve(auction_address, web3.utils.toBN(low)).send({from: account_address}, (error, value) => {
+            usdt.methods.approve(auction_address, toUsdt(low)).send({from: account_address}, (error, value) => {
               if (error) {
                 reject(error)
               } else {
-                console.log("auth result", value)
-                resolve(value)
+                usdt.once("Approval", { fromBlock: "latest" }, (error, event) => {
+                  console.log("收到Approval事件回调", event)
+                  alert("授权成功，开始发起竞拍")
+                  resolve(value)
+                })
+                console.log(`auth(${toUsdt(low)}) = ${value}`)
               }
             })
           })
         }
         function auctionGaz(offer, num) {
           return new Promise((resolve, reject) => {
-            auction.methods.auction(web3.utils.toBN(num), web3.utils.toBN(offer)).send({from: account_address}, (error, value) => {
+            auction.methods.auction(toWei(num), toUsdt(offer)).send({from: account_address}, (error, value) => {
               if (error) {
                 reject(error)
               } else {
-                console.log("auctionGaz result", value)
+                console.log(`auctionGaz(${offer}, ${num}) = ${value}`)
                 resolve(value)
               }
             })
           })
         }
-        function checkUserGross(num) {
+        function checkUserGross(offer) {
           return new Promise((resolve, reject) => {
-            auction.methods.check(depi, web3.utils.toBN(num)).call((error, value) => {
+            auction.methods.check(depi, toUsdt(offer)).call((error, value) => {
               if (error) {
                 reject(error)
               } else {
-                console.log(`checkUserGross(${num}) = ${value}`)
-                resolve(value / Math.pow(10, 18))
+                console.log(`checkUserGross(${offer}) = ${fromWei(value)}`)
+                resolve(fromWei(value))
               }
             })
           })
         }
         let enabled = true
-        if (this.form.low == 0 || this.form.gross == 0) {
-          alert("出价和数量都需要大于0")
+        if (this.form.gross == 0) {
+          alert("数量需要大于0")
+        } else if (balanc > 0 && this.form.low < low) {
+          alert("出价不能低于" + low + " USDT")
+        } else if (balanc == 0 && this.form.low <= low) {
+          alert("出价需大于" + low + " USDT")
         } else {
           let max_gross = balanc
           if (this.form.low > low) {
-            max_gross += await checkUserGross(this.form.low * Math.pow(10, 18))
+            max_gross += await checkUserGross(this.form.low)
           }
           if (this.form.gross > max_gross) {
             alert("数量不能多于: " + max_gross.toFixed(2) + " GAZ")
@@ -229,9 +263,14 @@
             let require_num = this.form.low * this.form.gross
             if (auth_num < require_num) {
               alert("USDT合约还未进行授权或授权数额不够，要先授权才能进行转账操作")
-              await auth(require_num * Math.pow(10, 18))
+              let hash = await auth(require_num * 10).catch(console.log)
+              if (! hash) {
+                alert("授权失败")
+                this.auction_enabled = enabled
+                return
+              }
             }
-            let hash = await auctionGaz(this.form.low * Math.pow(10, 18), this.form.gross * Math.pow(10, 18)).catch(error => {
+            let hash = await auctionGaz(this.form.low, this.form.gross).catch(error => {
               console.log(error)
             })
             if (hash) {
