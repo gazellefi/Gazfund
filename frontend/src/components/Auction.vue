@@ -49,9 +49,9 @@
   }
 
   let account_address = ""
-  let auction_address = "0xBbe0DfB5186aE9106921FDeA9EAf98A20A277b88"//"0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
+  let auction_address = "0x50968190b1B0b17A726090c12D8555e774BfA689"//"0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
   let auction = new web3.eth.Contract(AuctionAbi, auction_address)
-  let usdt = new web3.eth.Contract(USDTAbi, "0x250efAE8Cee54Cf9768E54cfF4dE5250A7830B2C")
+  let usdt = new web3.eth.Contract(USDTAbi, "0xdac17f958d2ee523a2206206994597c13d831ec7")
 
   let depi, Tem, timb, low, sp, total, balanc, step, Tima, gross, intv
 
@@ -263,6 +263,15 @@
             let require_num = this.form.low * this.form.gross
             if (auth_num < require_num) {
               alert("USDT合约还未进行授权或授权数额不够，要先授权才能进行转账操作")
+              if (auth_num > 0) {
+                // USDT授权的时候如果还存在授权余额就需要先清零
+                let hash = await auth(0).catch(console.log)
+                if (! hash) {
+                  alert("授权失败")
+                  this.auction_enabled = enabled
+                  return
+                }
+              }
               let hash = await auth(require_num * 10).catch(console.log)
               if (! hash) {
                 alert("授权失败")
