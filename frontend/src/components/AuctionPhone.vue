@@ -44,9 +44,21 @@
     </van-row>
     <div class="query">
       <van-row type="flex" justify="space-around">
-        <van-col span="4"><el-button type="info" @click="purchase" plain>余额查询</el-button></van-col>
-        <van-col span="15" class="draw">0.0000 USDT</van-col>
+        <van-col span="4"><el-button type="success" @click="purchase" plain>余额查询</el-button></van-col>
+        <van-col span="15">{{gaz_balance.toFixed(4)}} GAZ</van-col>
       </van-row>
+    </div>
+    <div class="rule">
+      <h4>拍卖规则</h4>
+      1.如果本轮拍卖的剩余代币大于你要竞拍的数量，你可用起拍价购买<br />
+      2.如果本轮拍卖的剩余代币为0，你的出价必须高于当前最低出价<br />
+      3.加价必须是加价幅度的整数倍<br />
+      4.在竞拍结束前，按照最低出价的最后出价者最先淘汰的原则<br />
+      5.被淘汰后，退回相应资产
+    </div>
+    <div class="warning">
+      <h4>风险提示</h4>
+      去中心化OTC是进出DeFi世界的门户，是DeFi生态的新品类。Gazotc.fi处于发展初期,是一次借助区块链和智能合约，由社区参与仲裁的社会实践，没有可以参考的成功项目，风险极大。未来，Gazotc.fi由去中心化自治社区主导，目前由Gazelle.fi基金会负责召集项目的志愿者和开发者。由于众所周知的原因，基金会目前以匿名方式开展工作，无法做出保证项目成功的任何承若。参与者只能通过对项目愿景的了解，以及对实现愿景的智能合约和非智能合约手段进行审查，谨慎判断项目风险。本轮通过拍卖募集的资金主要用于技术维护，包括智能合约的测试、安全审计，为参与者提供便利操作的网站以及第三方身份认证接口等。参与者拍卖所得项目通证GAZ，目前只能作为参与项目的保证金，不能自由交易
     </div>
     <router-view></router-view>
   </div>
@@ -68,11 +80,11 @@
   }
 
   let account_address = ""
-  let auction_address = "0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"//"0x50968190b1B0b17A726090c12D8555e774BfA689"
+  let auction_address = "0x9CA6e0d4e0b53cC009D0654e4e729475aa7dc20a"//"0x50968190b1B0b17A726090c12D8555e774BfA689"
   let auction = new web3.eth.Contract(AuctionAbi, auction_address)
   let usdt = new web3.eth.Contract(USDTAbi, "0xdac17f958d2ee523a2206206994597c13d831ec7")
 
-  let depi, Tem, timb, low, sp, total, balanc, step, Tima, gross, intv
+  let depi, Tem, timb, low, sp, total, balanc, step, Tima, gross, intv, gaz
 
   function fromWei(value) {
     return parseFloat(web3.utils.fromWei(value, 'ether'))
@@ -160,6 +172,8 @@
                 console.log(accounts)
                 account_address = accounts[0]
                 eventBus.$emit("key", "auction_enabled", true)
+                // 代币余额
+                auction.methods.balanceOf(account_address).call(null, make_callback("balanceOf"))
               })
             })
             // 最低价持有量
@@ -198,12 +212,16 @@
             // 用于计算剩余时间
             auction.methods.timb().call(null, make_callback("timb"))
           }
+          case "balanceOf": {
+            gaz = fromWei(value)
+            eventBus.$emit("key", "gaz_balance", gaz)
+          }
         }
       }
       eventBus.$emit("refreash")
       // 监听拍卖事件
-      auction.events.Auction({ fromBlock: "latest" }, (error, event) => {
-        console.log("收到Auction事件回调", event)
+      auction.events.Transfer({ fromBlock: "latest" }, (error, event) => {
+        console.log("收到Transfer事件回调", event)
         // alert(`用户${event.returnValues.ust}竞拍成功，将刷新界面`)
         eventBus.$emit("refreash")
       })
@@ -310,6 +328,15 @@
           }
         }
         this.auction_enabled = enabled
+      },
+      query() {
+        if (account_address == '') {
+          return
+        }
+        auction.methods.balanceOf(account_address).call(null, (error, result) => {
+          gaz = fromWei(result)
+          this.gaz_balance = gaz
+        })
       }
     },
     data() {
@@ -352,7 +379,9 @@
         },
         auction_enabled: false,
         // 剩余时间
-        remain_time: "..."
+        remain_time: "...",
+        // GAZ余额查询
+        gaz_balance: 0
       }
     }
   }
@@ -384,7 +413,7 @@
     /* background-color: cadetblue; */
     /* height: 12rem; */
     width: 100%;
-    font-size: 5px;
+    font-size: 10px;
     margin-top: 20px;
     text-align: center;
   }
@@ -415,7 +444,7 @@
 
   .operator {
     /* background-color:chocolate; */
-    font-size: 13px;
+    font-size: 11px;
     padding-top: 1.3rem;
     line-height: 30px;
   }
@@ -425,6 +454,36 @@
     height: 3rem;
     margin-top: 10px;
     /* background-color: chocolate; */
+  }
+
+  .query .van-col {
+    line-height: 3rem;
+    text-align: left;
+  }
+
+  .rule {
+    margin-top: 10px;
+    padding-left: 15px;
+    font-size: 13px;
+    /* background-color: chocolate; */
+  }
+
+  .rule h4 {
+    color: blue;
+    font-size: 15px;
+  }
+
+  .warning {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding-left: 15px;
+    font-size: 13px;
+    color: red;
+    /* background-color: chocolate; */
+  }
+
+  .warning h4 {
+    font-size: 15px;
   }
 
   .van-row {

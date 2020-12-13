@@ -49,7 +49,7 @@
   }
 
   let account_address = ""
-  let auction_address = "0x50968190b1B0b17A726090c12D8555e774BfA689"//"0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
+  let auction_address = "0x9CA6e0d4e0b53cC009D0654e4e729475aa7dc20a"//"0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
   let auction = new web3.eth.Contract(AuctionAbi, auction_address)
   let usdt = new web3.eth.Contract(USDTAbi, "0xdac17f958d2ee523a2206206994597c13d831ec7")
 
@@ -183,8 +183,8 @@
       }
       eventBus.$emit("refreash")
       // 监听拍卖事件
-      auction.events.Auction({ fromBlock: "latest" }, (error, event) => {
-        console.log("收到Auction事件回调", event)
+      auction.events.Transfer({ fromBlock: "latest" }, (error, event) => {
+        console.log("收到Transfer事件回调", event)
         // alert(`用户${event.returnValues.ust}竞拍成功，将刷新界面`)
         eventBus.$emit("refreash")
       })
