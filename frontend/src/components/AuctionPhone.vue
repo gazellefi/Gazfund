@@ -6,7 +6,7 @@
         <van-image width="150" height="150" :src="require('@/assets/title.png')" />
       </van-col>
       <van-col span="11" class="header-col-right">
-        gzotc.fi<br />
+        gazotc.fi<br />
         全球首创<br />
         去中心化OTC交易平台<br />
         Defi世界的门户<br />
@@ -80,7 +80,7 @@
   }
 
   let account_address = ""
-  let auction_address = "0x9CA6e0d4e0b53cC009D0654e4e729475aa7dc20a"//"0x50968190b1B0b17A726090c12D8555e774BfA689"
+  let auction_address = "0x8620ba21505AB542E397b6778ddFB6F0aD1b9CEd"//"0x50968190b1B0b17A726090c12D8555e774BfA689"
   let auction = new web3.eth.Contract(AuctionAbi, auction_address)
   let usdt = new web3.eth.Contract(USDTAbi, "0xdac17f958d2ee523a2206206994597c13d831ec7")
 

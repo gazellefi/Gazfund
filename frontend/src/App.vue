@@ -8,7 +8,11 @@
 <script>
   export default {
     created() {
-      // this.$router.push('/auction')
+      if (/(iPhone|iPad|iPod|iOS|Android)/i.test(navigator.userAgent)) { //移动端
+        this.$router.push('/auction-phone')
+      } else {
+        this.$router.push('/auction')
+      }
     }
   }
 </script>

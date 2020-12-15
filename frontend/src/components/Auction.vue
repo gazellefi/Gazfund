@@ -52,7 +52,7 @@
   }
 
   let account_address = ""
-  let auction_address = "0x9CA6e0d4e0b53cC009D0654e4e729475aa7dc20a"//"0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
+  let auction_address = "0x8620ba21505AB542E397b6778ddFB6F0aD1b9CEd"//"0xeCe84639f95a00bb54682aD54Bd91cDDe71bF0A6"
   let auction = new web3.eth.Contract(AuctionAbi, auction_address)
   let usdt = new web3.eth.Contract(USDTAbi, "0xdac17f958d2ee523a2206206994597c13d831ec7")
 
