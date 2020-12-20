@@ -44,7 +44,7 @@
     </van-row>
     <div class="query">
       <van-row type="flex" justify="space-around">
-        <van-col span="4"><el-button type="success" @click="purchase" plain>余额查询</el-button></van-col>
+        <van-col span="4"><el-button type="success" @click="query" plain>余额查询</el-button></van-col>
         <van-col span="15">{{gaz_balance.toFixed(4)}} GAZ</van-col>
       </van-row>
     </div>
